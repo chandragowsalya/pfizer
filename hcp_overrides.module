@@ -1,0 +1,64 @@
+
+function hcp_overrides_preprocess_page(&$variables){
+  if(isset($variables['node']) && arg(2) != 'edit')
+    $variables['theme_hook_suggestions'][] = 'page__'. $variables['node']->type;
+}
+
+function template_preprocess_node(&$variables) {
+  $variables['view_mode'] = $variables['elements']['#view_mode'];
+
+  // Provide a distinct $teaser boolean.
+  $variables['teaser'] = $variables['view_mode'] == 'teaser';
+  $variables['node'] = $variables['elements']['#node'];
+
+  /** @var \Drupal\node\NodeInterface $node */
+  $node = $variables['node'];
+  $variables['date'] = drupal_render($variables['elements']['created']);
+  unset($variables['elements']['created']);
+  $variables['author_name'] = drupal_render($variables['elements']['uid']);
+  unset($variables['elements']['uid']);
+  $variables['url'] = $node
+    ->url('canonical', array(
+    'language' => $node
+      ->language(),
+  ));
+  $variables['label'] = $variables['elements']['title'];
+  unset($variables['elements']['title']);
+
+  // The 'page' variable is set to TRUE in two occasions:
+  //   - The view mode is 'full' and we are on the 'node.view' route.
+  //   - The node is in preview and view mode is either 'full' or 'default'.
+  $variables['page'] = $variables['view_mode'] == 'full' && node_is_page($node) || isset($node->in_preview) && in_array($node->preview_view_mode, array(
+    'full',
+    'default',
+  ));
+
+  // Helpful $content variable for templates.
+  $variables += array(
+    'content' => array(),
+  );
+  foreach (Element::children($variables['elements']) as $key) {
+    $variables['content'][$key] = $variables['elements'][$key];
+  }
+
+  // Display post information only on certain node types.
+  $node_type = $node->type->entity;
+
+  // Used by RDF to add attributes around the author and date submitted.
+  $variables['author_attributes'] = new Attribute();
+  $variables['display_submitted'] = $node_type
+    ->displaySubmitted();
+  if ($variables['display_submitted']) {
+    if (theme_get_setting('features.node_user_picture')) {
+
+      // To change user picture settings (e.g. image style), edit the 'compact'
+      // view mode on the User entity. Note that the 'compact' view mode might
+      // not be configured, so remember to always check the theme setting first.
+      $variables['author_picture'] = user_view($node
+        ->getOwner(), 'compact');
+    }
+  }
+
+  // Add article ARIA role.
+  $variables['attributes']['role'] = 'article';
+}
